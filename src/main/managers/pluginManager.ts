@@ -9,7 +9,12 @@ import api from '../api'
 import { WINDOW_INITIAL_HEIGHT, WINDOW_DEFAULT_HEIGHT, WINDOW_WIDTH } from '../common/constants'
 import detachedWindowManager, { DETACHED_TITLEBAR_HEIGHT } from '../core/detachedWindowManager'
 import { GLOBAL_SCROLLBAR_CSS } from '../core/globalStyles'
-import { canPluginUseInternalApi, isBundledInternalPlugin } from '../core/internalPlugins'
+import {
+  CUSTOM_INTERNAL_API_PLUGIN_NAMES_KEY,
+  canPluginUseInternalApi,
+  isBundledInternalPlugin,
+  normalizeCustomInternalApiPluginNames
+} from '../core/internalPlugins'
 import { getInternalPluginUrl, getInternalPluginServerPort } from '../core/internalPluginServer'
 import pluginWindowManager from '../core/pluginWindowManager'
 import { registerIconProtocolForSession } from '../core/iconProtocol'
@@ -1900,6 +1905,11 @@ export class PluginManager {
     }
   }
 
+  private getCustomInternalApiPluginNames(): string[] {
+    const settings = databaseAPI.dbGet('settings-general') || {}
+    return normalizeCustomInternalApiPluginNames(settings[CUSTOM_INTERNAL_API_PLUGIN_NAMES_KEY])
+  }
+
   /**
    * 根据 WebContents 获取插件信息
    * @param webContents WebContents 实例
@@ -1912,13 +1922,18 @@ export class PluginManager {
     isBundledInternal: boolean
     logo?: string
   } | null {
+    const customInternalApiPluginNames = this.getCustomInternalApiPluginNames()
+
     // 1. 先检查主窗口中的插件视图
     for (const pluginViewInfo of this.pluginViews) {
       if (pluginViewInfo.view.webContents === webContents) {
         return {
           name: pluginViewInfo.name,
           path: pluginViewInfo.path,
-          canUseInternalApi: canPluginUseInternalApi(pluginViewInfo.name),
+          canUseInternalApi: canPluginUseInternalApi(
+            pluginViewInfo.name,
+            customInternalApiPluginNames
+          ),
           isBundledInternal: isBundledInternalPlugin(pluginViewInfo.name),
           logo: pluginViewInfo.logo
         }
@@ -1932,7 +1947,10 @@ export class PluginManager {
         return {
           name: windowInfo.pluginName,
           path: windowInfo.pluginPath,
-          canUseInternalApi: canPluginUseInternalApi(windowInfo.pluginName),
+          canUseInternalApi: canPluginUseInternalApi(
+            windowInfo.pluginName,
+            customInternalApiPluginNames
+          ),
           isBundledInternal: isBundledInternalPlugin(windowInfo.pluginName)
         }
       }

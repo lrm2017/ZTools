@@ -20,6 +20,22 @@ export const INTERNAL_API_PLUGIN_NAMES = [
 export type BundledInternalPluginName = (typeof BUNDLED_INTERNAL_PLUGIN_NAMES)[number]
 export type InternalApiPluginName = (typeof INTERNAL_API_PLUGIN_NAMES)[number]
 
+export const CUSTOM_INTERNAL_API_PLUGIN_NAMES_KEY = 'customInternalApiPluginNames'
+
+export function normalizeCustomInternalApiPluginNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map((name) => (typeof name === 'string' ? name.trim() : ''))
+        .filter((name) => name.length > 0)
+    )
+  )
+}
+
 /**
  * 判断是否为随包内置插件
  * @param pluginName 插件名称
@@ -34,8 +50,15 @@ export function isBundledInternalPlugin(pluginName: string): boolean {
  * @param pluginName 插件名称
  * @returns 是否拥有内部 API 权限
  */
-export function canPluginUseInternalApi(pluginName: string): boolean {
-  return INTERNAL_API_PLUGIN_NAMES.includes(pluginName as InternalApiPluginName)
+export function canPluginUseInternalApi(
+  pluginName: string,
+  customPluginNames: string[] = []
+): boolean {
+  if (INTERNAL_API_PLUGIN_NAMES.includes(pluginName as InternalApiPluginName)) {
+    return true
+  }
+
+  return customPluginNames.includes(pluginName)
 }
 
 /**
