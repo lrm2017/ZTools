@@ -8,6 +8,7 @@ import { spawn } from 'child_process'
 import yaml from 'yaml'
 import databaseAPI from './shared/database.js'
 import { applyWindowMaterial, getDefaultWindowMaterial } from '../utils/windowUtils.js'
+import { syncWindowsUninstallVersion } from '../utils/registrySync.js'
 
 /**
  * 更新路径配置
@@ -37,6 +38,7 @@ export class UpdaterAPI {
     this.mainWindow = mainWindow
     this.setupIPC()
     this.startAutoCheck()
+    syncWindowsUninstallVersion()
   }
 
   private setupIPC(): void {
