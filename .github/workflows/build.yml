@@ -29,6 +29,10 @@ jobs:
           - os: windows-latest
             arch: x64
             build_cmd: pnpm run build:win
+          # Linux x64 (ubuntu-24.04)
+          - os: ubuntu-24.04
+            arch: x64
+            build_cmd: pnpm run build:linux:x64
 
     steps:
       - name: Check out git repository
@@ -71,6 +75,8 @@ jobs:
             dist/*.exe
             dist/*.dmg
             dist/*.zip
+            dist/*.deb
+            dist/*.AppImage
           if-no-files-found: warn
 
   release:
@@ -114,6 +120,12 @@ jobs:
           name: artifact-windows-latest-x64
           path: dist
 
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: artifact-ubuntu-24.04-x64
+          path: dist
+
       # 生成更新信息和下载链接
       - name: Generate update info
         run: pnpm updater
@@ -127,6 +139,8 @@ jobs:
             dist/*.exe
             dist/*.dmg
             dist/*.zip
+            dist/*.deb
+            dist/*.AppImage
             latest.yml
 
       # # 安装 ossutil

@@ -6,11 +6,11 @@
 
 **一个高性能、可扩展的应用启动器和插件平台**
 
-_uTools 的开源实现 | 支持 macOS 和 Windows_
+_uTools 的开源实现 | 支持 macOS、Windows 和 Linux_
 
-[![GitHub release](https://img.shields.io/github/v/release/lzx8589561/ZTools)](https://github.com/ZToolsCenter/ZTools/releases)
+[![GitHub release](https://img.shields.io/github/v/release/lrm2017/ZTools)](https://github.com/lrm2017/ZTools/releases)
 [![License](https://img.shields.io/github/license/lzx8589561/ZTools)](./LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue)](https://github.com/ZToolsCenter/ZTools)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://github.com/lrm2017/ZTools)
 
 [English](./README_EN.md) | 简体中文
 
@@ -25,7 +25,7 @@ _uTools 的开源实现 | 支持 macOS 和 Windows_
 - 📋 **剪贴板管理** - 历史记录、搜索、图片支持、跨平台原生实现
 - 🎨 **主题定制** - 系统/亮色/暗色模式，6 种主题色可选
 - ⚡ **高性能** - LMDB 数据库、WebContentsView 架构、极速响应
-- 🌍 **跨平台** - 原生支持 macOS 和 Windows，统一体验
+- 🌍 **跨平台** - 原生支持 macOS、Windows 和 Linux，含 Ubuntu 24.04（Wayland）说明见下文
 - 🔒 **数据隔离** - 插件数据独立存储，安全可靠
 - 🛠️ **开发友好** - 完整的 TypeScript 类型支持，热重载开发
 - ⚙️ **最新技术栈** - Electron 38.5 + Node 22.20 + Chrome 140
@@ -70,16 +70,23 @@ _uTools 的开源实现 | 支持 macOS 和 Windows_
 
 #### 方式 1：下载预编译版本（推荐）
 
-从 [Releases](https://github.com/ZToolsCenter/ZTools/releases) 页面下载最新版本：
+从 [Releases](https://github.com/lrm2017/ZTools/releases) 页面下载最新版本：
 
 - **macOS**: `ztools-x.x.x.dmg` 或 `ZTools-x.x.x-arm64-mac.zip`
 - **Windows**: `ztools-x.x.x-setup.exe` 或 `ztools-x.x.x-win.zip`
+- **Linux**: `ZTools_x.x.x_amd64.deb`，或 `ZTools-x.x.x-linux-x86_64.AppImage`
+
+Ubuntu 24.04（GNOME/Wayland）说明：
+
+- 打包版本默认使用 `--ozone-platform=x11` 启动，减少 Wayland 下全局快捷键偶发失效；
+- 若 `Alt+Z` 在 Wayland 下不稳定，可在系统设置新增快捷键，命令填 `gtk-launch ztools`，绑定 `Alt+Z`；
+- 如系统中已占用 `Alt+Z`，建议先移除冲突绑定。
 
 #### 方式 2：从源码构建
 
 ```bash
 # 克隆仓库
-git clone https://github.com/ZToolsCenter/ZTools.git
+git clone https://github.com/lrm2017/ZTools.git
 cd ZTools
 
 # 安装依赖
@@ -141,7 +148,7 @@ ZTools 支持应用内一键更新，无需手动下载安装包：
 
 **技术实现**：
 
-- 更新源：GitHub Releases（[ZTools](https://github.com/ZToolsCenter/ZTools/releases)）
+- 更新源：GitHub Releases（[ZTools](https://github.com/lrm2017/ZTools/releases)）
 - 更新信息文件：`latest.yml`（包含版本号、更新日志等）
 - 更新包格式：ZIP 压缩包，命名格式为 `update-{platform}-{arch}-{version}.zip`
   - 示例：`update-darwin-arm64-1.2.8.zip`（macOS Apple Silicon）
@@ -161,6 +168,7 @@ ZTools 支持应用内一键更新，无需手动下载安装包：
 
 - ✅ macOS (Apple Silicon)
 - ✅ Windows (x64)
+- ✅ Linux (amd64 AppImage/deb)
 
 ## 🧩 插件开发
 
@@ -361,7 +369,7 @@ pnpm build:unpack       # 打包但不生成安装包（调试用）
 
 ## 🐛 问题反馈
 
-遇到问题？请在 [Issues](https://github.com/ZToolsCenter/ZTools/issues) 中反馈。
+遇到问题？请在 [Issues](https://github.com/lrm2017/ZTools/issues) 中反馈。
 
 提交 Issue 时请包含：
 
