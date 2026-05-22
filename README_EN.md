@@ -10,7 +10,7 @@ _Open Source Implementation of uTools | Supports macOS and Windows_
 
 [![GitHub release](https://img.shields.io/github/v/release/lzx8589561/ZTools)](https://github.com/ZToolsCenter/ZTools/releases)
 [![License](https://img.shields.io/github/license/lzx8589561/ZTools)](./LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-blue)](https://github.com/ZToolsCenter/ZTools)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://github.com/lrm2017/ZTools)
 
 English | [简体中文](./README.md)
 
@@ -25,7 +25,7 @@ English | [简体中文](./README.md)
 - 📋 **Clipboard Management** - History tracking, search, image support, cross-platform native implementation
 - 🎨 **Theme Customization** - System/light/dark mode with 6 theme colors to choose from
 - ⚡ **High Performance** - LMDB database, WebContentsView architecture, ultra-fast response
-- 🌍 **Cross-Platform** - Native support for macOS and Windows with unified experience
+- 🌍 **Cross-Platform** - Native support for macOS, Windows and Linux
 - 🔒 **Data Isolation** - Independent plugin data storage, secure and reliable
 - 🛠️ **Developer Friendly** - Complete TypeScript type support, hot reload development
 - ⚙️ **Modern Tech Stack** - Electron 38.5 + Node 22.20 + Chrome 140
@@ -335,7 +335,7 @@ pnpm build:unpack       # Package without installer (for debugging)
 - [x] Quick app launch and search
 - [x] Plugin system (UI + headless)
 - [x] Clipboard history management
-- [x] Cross-platform support (macOS + Windows)
+- [x] Cross-platform support (macOS + Windows + Linux)
 - [x] LMDB database migration
 - [x] Theme customization
 - [x] Data isolation
@@ -344,7 +344,7 @@ pnpm build:unpack       # Package without installer (for debugging)
 - [x] Separate plugins into independent windows
 - [ ] Plugin auto-update
 - [ ] Cloud sync (optional)
-- [ ] Linux support
+- [x] Linux support
 - [ ] MCP toolkit
 
 ## 🐛 Issue Reporting
