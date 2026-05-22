@@ -43,6 +43,15 @@ export class PluginScreenAPI {
 
     // 获取鼠标光标的屏幕坐标
     ipcMain.on('get-cursor-screen-point', (event) => {
+      // Linux/Wayland: getCursorScreenPoint() can segfault, return primary display center
+      if (process.platform === 'linux') {
+        const primary = screen.getPrimaryDisplay()
+        event.returnValue = {
+          x: primary.workArea.x + Math.floor(primary.workArea.width / 2),
+          y: primary.workArea.y + Math.floor(primary.workArea.height / 2)
+        }
+        return
+      }
       const point = screen.getCursorScreenPoint()
       event.returnValue = point
     })

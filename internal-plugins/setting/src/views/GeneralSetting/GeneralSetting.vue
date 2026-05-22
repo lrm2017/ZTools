@@ -102,7 +102,7 @@ const platform = ref<'darwin' | 'win32' | 'linux'>('darwin')
 
 // 默认快捷键（根据平台区分文案）
 const defaultHotkey = computed(() => {
-  return platform.value === 'win32' ? 'Alt+Z' : 'Option+Z'
+  return platform.value === 'darwin' ? 'Option+Z' : 'Alt+Z'
 })
 
 // 快捷键预设选项（根据平台）

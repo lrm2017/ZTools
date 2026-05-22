@@ -220,7 +220,17 @@ class SuperPanelManager {
   private onMouseTrigger(): MouseMonitorResult {
     try {
       // 1. 记录鼠标位置
-      const cursorPoint = screen.getCursorScreenPoint()
+      // Linux/Wayland: getCursorScreenPoint() can segfault, use primary display center
+      const cursorPoint =
+        process.platform === 'linux'
+          ? (() => {
+              const primary = screen.getPrimaryDisplay()
+              return {
+                x: primary.workArea.x + Math.floor(primary.workArea.width / 2),
+                y: primary.workArea.y + Math.floor(primary.workArea.height / 2)
+              }
+            })()
+          : screen.getCursorScreenPoint()
 
       // 1.5. 记录触发前的窗口信息
       // 优先使用 getActiveWindow() 实时获取前台窗口（更准确），回退到缓存的窗口信息

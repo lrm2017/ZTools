@@ -60,6 +60,8 @@ linux:
     - deb
   maintainer: electronjs.org
   category: Utility
+  executableArgs:
+    - '--ozone-platform=x11'
 appImage:
   artifactName: ${name}-${version}-${os}-${arch}.${ext}
 npmRebuild: false

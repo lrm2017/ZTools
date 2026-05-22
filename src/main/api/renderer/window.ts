@@ -92,7 +92,11 @@ export class WindowAPI {
       // 使用固定宽度常量，避免多显示器 DPI 缩放导致 getSize() 返回被缩放的值
       const width = WINDOW_WIDTH
       // 限制高度范围: 最小初始高度, 最大不超过当前屏幕可用高度
-      const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+      // Linux/Wayland: getCursorScreenPoint() can segfault, use primary display
+      const display =
+        process.platform === 'linux'
+          ? screen.getPrimaryDisplay()
+          : screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
       const maxHeight = display.workAreaSize.height
       const newHeight = Math.max(WINDOW_INITIAL_HEIGHT, Math.min(height, maxHeight))
 

@@ -9,6 +9,7 @@ import {
   screen,
   Tray
 } from 'electron'
+import { uIOhook, UiohookKey } from 'uiohook-napi'
 import path from 'path'
 // import trayIconLight from '../../../resources/icons/trayTemplate@2x-light.png?asset'
 import trayIcon from '../../../resources/icons/trayTemplate@2x.png?asset'
@@ -56,7 +57,8 @@ class WindowManager {
   private mainWindow: BrowserWindow | null = null
   private tray: Tray | null = null
   private trayMenu: Menu | null = null // 托盘菜单
-  private currentShortcut = 'Option+Z' // 当前注册的快捷键
+  // Linux 不支持 Option 修饰键，需用 Alt 替代
+  private currentShortcut = process.platform === 'linux' ? 'Alt+Z' : 'Option+Z'
   private isDoubleTapMode = false // 当前呼出快捷键是否为双击修饰键模式
   private static readonly MODIFIER_NAMES = ['Command', 'Ctrl', 'Alt', 'Option', 'Shift']
   private isQuitting = false // 是否正在退出应用
@@ -81,6 +83,65 @@ class WindowManager {
   private isRestoringFocus: boolean = false // 是否正在恢复焦点状态（防止 focus 事件监听器干扰）
   private suppressBlurHide: boolean = false // 临时抑制 blur 事件隐藏窗口（文件关联打开等场景）
   private lastBlurHideTime: number = 0 // blur 导致隐藏窗口的时间戳（用于解决托盘点击竞态）
+  private lastShowTime: number = 0 // 上次调用 showWindow 的时间戳（XWayland 焦点保护）
+
+  // Linux: uiohook 全局快捷键（替代 globalShortcut，Wayland 兼容）
+  private static readonly ACCELERATOR_TO_UIOHOOK: Record<string, string> = {
+    Space: 'Space',
+    Return: 'Enter',
+    Escape: 'Escape',
+    Tab: 'Tab',
+    Backspace: 'Backspace',
+    Delete: 'Delete',
+    Insert: 'Insert',
+    Up: 'ArrowUp',
+    Down: 'ArrowDown',
+    Left: 'ArrowLeft',
+    Right: 'ArrowRight',
+    Home: 'Home',
+    End: 'End',
+    PageUp: 'PageUp',
+    PageDown: 'PageDown',
+    Capslock: 'CapsLock',
+    Numlock: 'NumLock',
+    Scrolllock: 'ScrollLock',
+    PrintScreen: 'PrintScreen',
+    '`': 'Backquote',
+    '-': 'Minus',
+    '=': 'Equal',
+    '[': 'BracketLeft',
+    ']': 'BracketRight',
+    '\\': 'Backslash',
+    ';': 'Semicolon',
+    "'": 'Quote',
+    ',': 'Comma',
+    '.': 'Period',
+    '/': 'Slash',
+    num0: 'Numpad0',
+    num1: 'Numpad1',
+    num2: 'Numpad2',
+    num3: 'Numpad3',
+    num4: 'Numpad4',
+    num5: 'Numpad5',
+    num6: 'Numpad6',
+    num7: 'Numpad7',
+    num8: 'Numpad8',
+    num9: 'Numpad9',
+    numdec: 'NumpadDecimal',
+    numadd: 'NumpadAdd',
+    numsub: 'NumpadSubtract',
+    nummult: 'NumpadMultiply',
+    numdiv: 'NumpadDivide'
+  }
+  private uiohookShortcutHandler:
+    | ((e: {
+        keycode: number
+        altKey: boolean
+        ctrlKey: boolean
+        shiftKey: boolean
+        metaKey: boolean
+      }) => void)
+    | null = null
   private blurHideTimer: ReturnType<typeof setTimeout> | null = null // Linux blur 延迟隐藏定时器
   private appShortcuts: Map<string, string> = new Map() // 应用快捷键映射表 (快捷键 -> 目标指令)
   private wakeupBlacklist: Array<{ app: string; bundleId?: string; label?: string }> = [] // 唤醒黑名单
@@ -118,6 +179,14 @@ class WindowManager {
     y: number
     id: number
   } {
+    // Linux/Wayland: getCursorScreenPoint() can segfault, use primary display instead
+    if (process.platform === 'linux') {
+      const display = screen.getPrimaryDisplay()
+      return {
+        ...display.workArea,
+        id: display.id
+      }
+    }
     const cursorPoint = screen.getCursorScreenPoint()
     const display = screen.getDisplayNearestPoint(cursorPoint)
     return {
@@ -293,6 +362,11 @@ class WindowManager {
 
     this.mainWindow.on('blur', () => {
       if (this.suppressBlurHide) return
+      // XWayland: showWindow 后短时间内不因 blur 而隐藏（焦点可能未完全转移）
+      if (platform.isLinux && Date.now() - this.lastShowTime < 800) {
+        console.log('[blur] 窗口刚显示，忽略 blur 隐藏（XWayland 焦点保护）')
+        return
+      }
 
       if (platform.isLinux) {
         // Linux 上去掉了 type:'panel'，现在 blur 只会在真正点击其他窗口时触发。
@@ -495,6 +569,7 @@ class WindowManager {
       doubleTapManager.unregister(oldModifier)
     } else {
       globalShortcut.unregister(this.currentShortcut)
+      this.unregisterUiohookShortcut()
     }
 
     // 双击修饰键模式：通过 doubleTapManager 注册
@@ -509,7 +584,34 @@ class WindowManager {
       return true
     }
 
-    // 普通快捷键模式：通过 globalShortcut 注册
+    // Linux: 优先尝试 globalShortcut（XWayland 兼容），失败后回退到 uiohook
+    if (process.platform === 'linux') {
+      const gsRet = globalShortcut.register(keyToRegister, () => {
+        console.log('[GlobalShortcut] 回调触发，调用 toggleWindow')
+        this.toggleWindow()
+      })
+
+      if (gsRet) {
+        this.currentShortcut = keyToRegister
+        this.isDoubleTapMode = false
+        this.unregisterUiohookShortcut()
+        console.log(`[GlobalShortcut] 快捷键 ${keyToRegister} 注册成功`)
+        return true
+      }
+
+      console.warn(`[GlobalShortcut] 快捷键 ${keyToRegister} 注册失败，回退到 uiohook`)
+      const uiohookRet = this.registerUiohookShortcut(keyToRegister)
+      if (uiohookRet) {
+        this.currentShortcut = keyToRegister
+        this.isDoubleTapMode = false
+        console.log(`[Uiohook] 快捷键 ${keyToRegister} 注册成功`)
+        return true
+      }
+      console.error(`[Uiohook] 快捷键注册也失败: ${keyToRegister}`)
+      return false
+    }
+
+    // 普通快捷键模式：通过 globalShortcut 注册（macOS/Windows/Linux 回退）
     const ret = globalShortcut.register(keyToRegister, () => {
       this.toggleWindow()
     })
@@ -535,6 +637,81 @@ class WindowManager {
     }
 
     return ret
+  }
+
+  /**
+   * 将 Electron accelerator 键名映射为 UiohookKey 枚举名
+   */
+  private mapAcceleratorToUiohookKeyName(key: string): string | null {
+    // 单字母和数字直接匹配
+    if (/^[A-Z0-9]$/.test(key)) return key
+    // F1-F24 直接匹配
+    if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) return key
+    // 查映射表
+    return WindowManager.ACCELERATOR_TO_UIOHOOK[key] || null
+  }
+
+  /**
+   * 通过 uiohook 注册全局快捷键（Linux Wayland 兼容方案）
+   */
+  private registerUiohookShortcut(shortcut: string): boolean {
+    const parts = shortcut.split('+')
+    if (parts.length < 2) {
+      console.error('[Uiohook] 快捷键格式无效（至少需要一个修饰键+主键）:', shortcut)
+      return false
+    }
+
+    const mainKey = parts.pop()!
+    const modifiers = parts
+
+    const uiohookKeyName = this.mapAcceleratorToUiohookKeyName(mainKey)
+    if (!uiohookKeyName) {
+      console.error('[Uiohook] 不支持的按键:', mainKey)
+      return false
+    }
+
+    const needAlt = modifiers.includes('Alt')
+    const needCtrl = modifiers.includes('Ctrl')
+    const needShift = modifiers.includes('Shift')
+    const needMeta = modifiers.includes('Command')
+
+    // 先注销旧 handler
+    this.unregisterUiohookShortcut()
+
+    this.uiohookShortcutHandler = (e) => {
+      if (needAlt !== e.altKey) return
+      if (needCtrl !== e.ctrlKey) return
+      if (needShift !== e.shiftKey) return
+      if (needMeta !== e.metaKey) return
+
+      const pressedKey = UiohookKey[e.keycode]
+      if (pressedKey === uiohookKeyName) {
+        this.toggleWindow()
+      }
+    }
+
+    uIOhook.on('keydown', this.uiohookShortcutHandler)
+
+    try {
+      uIOhook.start()
+      console.log('[Uiohook] 全局键盘监听已启动')
+    } catch (error) {
+      console.error('[Uiohook] 启动键盘监听失败:', error)
+      this.unregisterUiohookShortcut()
+      return false
+    }
+
+    return true
+  }
+
+  /**
+   * 注销 uiohook 快捷键 handler
+   */
+  private unregisterUiohookShortcut(): void {
+    if (this.uiohookShortcutHandler) {
+      uIOhook.removeListener('keydown', this.uiohookShortcutHandler)
+      this.uiohookShortcutHandler = null
+    }
   }
 
   public setPreviousActiveWindow(
@@ -574,6 +751,7 @@ class WindowManager {
 
     const isFocused = this.mainWindow.isFocused()
     const isVisible = this.mainWindow.isVisible()
+    console.log(`[toggleWindow] isFocused=${isFocused} isVisible=${isVisible}`)
 
     // 判断窗口是否聚焦显示
     // 修复：同时检查聚焦和可见状态，避免alert弹窗后判断错误
@@ -658,6 +836,8 @@ class WindowManager {
    */
   public showWindow(): void {
     if (!this.mainWindow) return
+    this.lastShowTime = Date.now()
+    console.log('[showWindow] 开始显示窗口...')
 
     // 开始恢复焦点流程，防止 focus 事件监听器修改 lastFocusTarget
     this.isRestoringFocus = true
@@ -672,6 +852,7 @@ class WindowManager {
 
       // 唤醒黑名单检查：当前活动窗口在黑名单中时不弹出
       if (this.isAppInWakeupBlacklist(currentWindow)) {
+        console.log('[showWindow] 当前窗口在黑名单中，取消显示')
         this.isRestoringFocus = false
         return
       }
@@ -683,8 +864,15 @@ class WindowManager {
     // mainHide feature 启动时可能把插件视图高度压成 0，窗口重新显示时按需恢复
     pluginManager.restoreCurrentPluginViewHeightOnWindowShow()
 
+    console.log('[showWindow] 调用 forceActivateWindow...')
     // 使用强制激活逻辑（注意：show 事件会清除 isRestoringFocus 标志）
     this.forceActivateWindow()
+    console.log(
+      '[showWindow] 窗口已显示, isVisible=',
+      this.mainWindow.isVisible(),
+      'isFocused=',
+      this.mainWindow.isFocused()
+    )
   }
 
   /**
@@ -877,6 +1065,12 @@ class WindowManager {
   public unregisterAllShortcuts(): void {
     globalShortcut.unregisterAll()
     doubleTapManager.unregisterAll()
+    this.unregisterUiohookShortcut()
+    try {
+      uIOhook.stop()
+    } catch (_) {
+      /* ignore */
+    }
     this.isDoubleTapMode = false
   }
 
